@@ -8,6 +8,7 @@
 #include <SoftwareSerial.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
+#include <Config.h>
 
 
 SoftwareSerial espSerial(1, 0); // RX, TX
@@ -23,8 +24,9 @@ void selectCategory();
 byte convertSeconds();
 void setServoAngle(uint16_t pulseWidth);
 void custom_delay_us(uint16_t us);
-void ocBox();
 void printCat();
+void clearRow(byte row);
+
 
 enum Category {
   Study, 
@@ -118,13 +120,12 @@ void basicTimer()
           TCNT1 = 0;
           segundos--;
           // TODO Fix lcd clear
-          lcd.clear();
+          clearRow(0);
           lcd.setCursor(0, 0);
           lcd.print("Timer -> ");
           lcd.print(segundos);
           lcd.print(":");
           lcd.print(count--);
-          printCat();
           if(count == 0) {count = 59;}
       }
    }
@@ -167,7 +168,8 @@ void connectToWIFI() {
 
   espSerial.println("AT");
   _delay_ms(1000);
-  espSerial.println("AT+CWJAP=\"Fibertel  2.4GHz\",\"\"");
+  String command =  "AT+CWJAP=\"" + String(WIFI_SSID) + "\",\"" + String(WIFI_PWD) + "\"";
+  espSerial.println(command);
 }
 
 void setupI2C_LCD() {
@@ -208,4 +210,10 @@ void printCat()
   lcd.setCursor(0, 1);
   lcd.print("Cat: ");
   lcd.print(selectedCategory);
+}
+
+void clearRow(byte row)
+{
+  lcd.setCursor(0, row);
+  lcd.print("        ");
 }
