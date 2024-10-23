@@ -38,7 +38,7 @@ enum Category {
 #define ADC_CHANNEL 7 // A7 corresponds to ADC channel 7
 
 
-unsigned long segundos = 5; // 1500 segundos = 25 minutos
+int segundos = 5; // 1500 segundos = 25 minutos
 short int breakSeconds = 5; // 500 = 5 minutos
 int selectSeconds = 5; // Valor por default
 int selectBreakSeconds = 5; // Valor por default
@@ -103,7 +103,15 @@ int main(void) {
     // connectToWIFI();
 
     setupI2C_LCD();
+    _delay_ms(2000);
 
+    clearRow(0);
+    clearRow(1);
+    lcd.setCursor(0, 0);
+    lcd.print("Pomodoro 25/5");
+    lcd.setCursor(0, 1);
+    lcd.print("Cat: ");
+    lcd.print(selectedCategory);
   while (1) {
 
     uint16_t potValue = ADC_Read(ADC_CHANNEL);
@@ -176,7 +184,7 @@ void basicTimer()
           clearRow(0);
           lcd.setCursor(0, 0);
           lcd.print("Timer -> ");
-          lcd.print(segundos);
+          lcd.print(segundos/60);
           lcd.print(":");
           lcd.print(count--);
           if(count == 0) {count = 59;}
@@ -187,6 +195,7 @@ void basicTimer()
     if (PORTD & (1 << PORTD2)) {
     PORTD &= ~(1 << PORTD2); 
     }
+    
     breakTimer();
    }
 }
@@ -207,7 +216,7 @@ void breakTimer()
           clearRow(0);
           lcd.setCursor(0, 0);
           lcd.print("Descanso -> ");
-          lcd.print(segundos);
+          lcd.print(breakSeconds/60);
           lcd.print(":");
           lcd.print(count--);
           if(count == 0) {count = 59;}
@@ -220,6 +229,9 @@ void breakTimer()
     }
     clearRow(0);
     pomos = pomos + 1;  
+    lcd.setCursor(0,1);
+    lcd.print("           - P=");
+    lcd.print(pomos);
     continueTimer();
   }
 }
@@ -250,7 +262,9 @@ void setupI2C_LCD() {
   lcd.init();        
   lcd.backlight();   
   lcd.clear();       
-  lcd.print("Ready");  
+  lcd.print("- POMODUINO V1 -");  
+  lcd.setCursor(0, 1);
+  lcd.print("- Lucas Perata -");
 }
 
 void selectCategory() {
@@ -270,7 +284,6 @@ void selectCategory() {
     case 2: 
     selectedCategory = 0; 
     lcd.print("Test 3");
-    lcd.print(pomos);
     break;
     default:
       break;
@@ -295,7 +308,7 @@ void selectPomodoro(uint16_t pV)
 {
  if(!timerIsRunning) 
  {
-  if(pV == 7)
+  if(pV == 12)
     {
       selectSeconds = 5; 
       segundos = selectSeconds;
@@ -305,14 +318,14 @@ void selectPomodoro(uint16_t pV)
   lcd.setCursor(0, 0);
       lcd.print("Pomodoro 25/5");
     } 
-    else if(pV == 605)
+    else if(pV == 547)
     {
       selectSeconds = 6; 
       segundos = selectSeconds;
       selectBreakSeconds = 6;
       breakSeconds = selectBreakSeconds;
       clearRow(0);
-  lcd.setCursor(0, 0);
+      lcd.setCursor(0, 0);
       lcd.print("Pomodoro 35/10");
     } 
     else if(pV == 1001)
@@ -327,3 +340,8 @@ void selectPomodoro(uint16_t pV)
     }
  }
 }
+
+// TODO: Buzzer cambio entre tiempo y break 
+// TODO: Post request / Sync 
+// TODO: Detecting multiple button pressed 
+// TODO: lcd backlight off auto 
