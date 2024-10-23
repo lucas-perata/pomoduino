@@ -11,7 +11,7 @@
 #include <Config.h>
 
 
-SoftwareSerial espSerial(1, 0); // RX, TX
+SoftwareSerial espSerial(6 ,7); // RX, TX
 LiquidCrystal_I2C lcd(0x27, 16, 2);  // Address 0x27, 16 columns, 2 rows
 
 void basicTimer();
@@ -44,16 +44,22 @@ byte count  = 59;
 
 // TODO: track timers completados en una variable
 
+void printESPResponse() {
+  while (espSerial.available()) {
+    String response = espSerial.readStringUntil('\n'); // Lee hasta un salto de línea
+    Serial.println(response); // Muestra la respuesta en el monitor serial
+  }
+}
 
 int main(void) {
   sei();
-init();
+  init();
   Wire.begin();     
   
   setupI2C_LCD();
 
   // PORTD
-  DDRD = 0b00011101;
+  DDRD = 0b10011101;
 
   // LED on PORTD2 and LED on PORTD3 Buzzer on PORTD4
  // DDRD = (1 << DDD2) | (1 << DDD3);  
@@ -67,15 +73,33 @@ init();
 
  
 
- // connectToWIFI();    
+
 
 
     TCCR1A = 0; // Set Timer1 to Normal mode (WGM13:0 = 0)
     TCCR1B = (1 << CS12); // Set prescaler to 64
 
-
-
+    // connectToWIFI();
+ Serial.begin(9600);
+  espSerial.begin(9600);
+  Serial.println("Estableciendo conexión...");
+  espSerial.println("AT");
   while (1) {
+
+     // Envío de datos de Serial a espSerial
+  if (Serial.available()) {
+    char c = Serial.read();
+    espSerial.write(c); // Escribe en el ESP8266
+  }
+
+  // Envío de datos de espSerial a Serial
+  if (espSerial.available()) {
+    char c = espSerial.read();
+    Serial.write(c); // Escribe en el monitor serial
+  }
+
+  // Imprimir la respuesta del ESP8266
+  printESPResponse(); 
     
     if (ButtonPressed(0, PINB, 0, 100)) {
       if(!timerIsRunning)  
@@ -96,7 +120,6 @@ init();
     {
       selectCategory();
     }
-
     if(ButtonPressed(2, PINB, 2, 100))
     {
       PORTD &= (1 << 1);
@@ -164,12 +187,14 @@ void resetTimer()
 }
 
 void connectToWIFI() {
-  espSerial.begin(115200);
+  Serial.begin(9600);
+  espSerial.begin(9600);
 
   espSerial.println("AT");
-  _delay_ms(1000);
+  espSerial.println("AT+CWLAP");
   String command =  "AT+CWJAP=\"" + String(WIFI_SSID) + "\",\"" + String(WIFI_PWD) + "\"";
   espSerial.println(command);
+  
 }
 
 void setupI2C_LCD() {
