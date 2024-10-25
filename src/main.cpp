@@ -31,8 +31,8 @@ void selectPomodoro(uint16_t pV);
 
 
 enum Category {
-  Study, 
-  Test
+  Estudio, 
+  Trabajo
 };
 
 #define ADC_CHANNEL 7 // A7 corresponds to ADC channel 7
@@ -47,8 +47,7 @@ bool breakTimerIsRunning = false;
 Category selectedCategory = 0;
 byte count  = 59;
 byte pomos = 0; 
-
-// TODO: track timers completados en una variable
+bool screen = true; 
 
 void printESPResponse() {
   while (espSerial.available()) {
@@ -89,11 +88,6 @@ int main(void) {
   DDRB = 0b00000000; 
   PORTB = (1 << PINB0) | (1 << PINB1) | (1 << PINB2) | (1 << PINB3);  
 
- 
-
-
-
-
     TCCR1A = 0; // Set Timer1 to Normal mode (WGM13:0 = 0)
     TCCR1B = (1 << CS12); // Set prescaler to 64
 
@@ -112,57 +106,64 @@ int main(void) {
     lcd.setCursor(0, 1);
     lcd.print("Cat: ");
     lcd.print(selectedCategory);
-  while (1) {
 
-    uint16_t potValue = ADC_Read(ADC_CHANNEL);
+    while (1) {
 
-    selectPomodoro(potValue);
+      uint16_t potValue = ADC_Read(ADC_CHANNEL);
+
+      selectPomodoro(potValue);
 
 
-  if (Serial.available()) {
-    char c = Serial.read();
-    espSerial.write(c); 
-  }
-
-  if (espSerial.available()) {
-    char c = espSerial.read();
-    Serial.write(c); 
-  }
-
-  printESPResponse(); 
-    
-    if (ButtonPressed(0, PINB, 0, 100)) {
-      if(!timerIsRunning)  
-      {
-        timerIsRunning = true;
-        PORTD ^= (1 << PORTD2);  // Toggle LED
-        PORTD ^= (1 << PORTD4);  // Toggle Buzzer
+      if (Serial.available()) {
+        char c = Serial.read();
+        espSerial.write(c); 
       }
-      else 
-      {
-        PORTD ^= (1 << PORTD2);
-        timerIsRunning = false;
+
+      if (espSerial.available()) {
+        char c = espSerial.read();
+        Serial.write(c); 
+      }
+
+      printESPResponse(); 
+      
+      // Start-Stop timer 
+      if (ButtonPressed(0, PINB, 0, 100)) {
+        if(!timerIsRunning)  
+        {
+          timerIsRunning = true;
+          PORTD ^= (1 << PORTD2);  // Toggle LED
+          PORTD ^= (1 << PORTD4);  // Toggle Buzzer
         }
-    } 
+        else 
+        {
+          PORTD ^= (1 << PORTD2);
+          timerIsRunning = false;
+          }
+      } 
 
+      // Selección categoría 
+      if(ButtonPressed(1, PINB, 1, 100)) 
+      {
+        selectCategory();
+        espSerial.println("AT");
+      }
 
-    if(ButtonPressed(1, PINB, 1, 100)) 
-    {
-      selectCategory();
-      espSerial.println("AT");
+      // Reseteo timer
+      if(ButtonPressed(2, PINB, 2, 100))
+      {
+        PORTD &= (1 << 1);
+        clearRow(0);
+        lcd.setCursor(0, 0);
+        lcd.print("Timer reseteado");
+        resetTimer();
+      }
+    
+      // Apagado-encendido de pantalla 
+
+      // Sync 
+
+      basicTimer();
     }
-    if(ButtonPressed(2, PINB, 2, 100))
-    {
-      PORTD &= (1 << 1);
-      clearRow(0);
-      lcd.setCursor(0, 0);
-      lcd.print("Timer reseteado");
-      resetTimer();
-    }
-
-    basicTimer();
-  }
-
 }
 
 void basicTimer()
@@ -202,8 +203,6 @@ void basicTimer()
 
 void breakTimer()
 {
-
-  PORTD &= (1<<2);
   if (!(PORTD & (1 << PORTD3))) {
     PORTD |= (1 << PORTD3); 
   }
@@ -224,14 +223,18 @@ void breakTimer()
   }
   else 
   {
-     if (PORTD & (1 << PORTD3)) {
-    PORTD &= ~(1 << PORTD3); 
-    }
     clearRow(0);
     pomos = pomos + 1;  
     lcd.setCursor(0,1);
-    lcd.print("           - P=");
+    lcd.print("Cat: ");
+    lcd.print(selectedCategory);
+    lcd.print(" - P=");
     lcd.print(pomos);
+    // Apagar LED 
+    if (PORTD & (1 << PORTD3))
+    {
+      PORTD &= ~(1 < PORTD3);
+    }
     continueTimer();
   }
 }
@@ -308,7 +311,7 @@ void selectPomodoro(uint16_t pV)
 {
  if(!timerIsRunning) 
  {
-  if(pV == 12)
+  if(pV == 13)
     {
       selectSeconds = 5; 
       segundos = selectSeconds;
