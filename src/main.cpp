@@ -106,6 +106,8 @@ int main(void) {
     lcd.setCursor(0, 1);
     lcd.print("Cat: ");
     lcd.print(selectedCategory);
+    lcd.print(" - P: ");
+    lcd.print(pomos);
 
     while (1) {
 
@@ -170,18 +172,14 @@ void basicTimer()
 {
    if(segundos > 0) 
    {
-    if (timerIsRunning)
-    {
-      if (!(PORTD & (1 << PORTD2))) {
-          PORTD |= (1 << PORTD2); 
-        }
-    }
     if (TCNT1 > 63000 && timerIsRunning)
       {
+        if (!(PORTD & (1 << PORTD2))) {
+          PORTD |= (1 << PORTD2); 
+        }
           PORTD &= (1<<2); // Turn off buzzer
           TCNT1 = 0;
           segundos--;
-          // TODO Fix lcd clear
           clearRow(0);
           lcd.setCursor(0, 0);
           lcd.print("Timer -> ");
@@ -203,13 +201,15 @@ void basicTimer()
 
 void breakTimer()
 {
-  if (!(PORTD & (1 << PORTD3))) {
-    PORTD |= (1 << PORTD3); 
-  }
   if(breakSeconds > 0)
   {
     if (TCNT1 > 63000 && timerIsRunning)
       {
+
+        if (!(PORTD & (1 << PORTD3))) {
+          PORTD |= (1 << PORTD3); 
+          }
+
           TCNT1 = 0;
           breakSeconds--;
           clearRow(0);
@@ -228,7 +228,7 @@ void breakTimer()
     lcd.setCursor(0,1);
     lcd.print("Cat: ");
     lcd.print(selectedCategory);
-    lcd.print(" - P=");
+    lcd.print(" - P: ");
     lcd.print(pomos);
     // Apagar LED 
     if (PORTD & (1 << PORTD3))
@@ -254,7 +254,7 @@ void continueTimer()
 }
 
 void connectToWIFI() {
-  espSerial.println("AT");
+  lcd.print("Conectando WIFI");
   _delay_ms(500);
   String command =  "AT+CWJAP=\"" + String(WIFI_SSID) + "\",\"" + String(WIFI_PWD) + "\"";
   espSerial.println(command);
