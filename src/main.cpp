@@ -28,6 +28,7 @@ void custom_delay_us(uint16_t us);
 void printCat();
 void clearRow(byte row);
 void selectPomodoro(uint16_t pV);
+void welcomeMessage();
 
 
 enum Category {
@@ -35,7 +36,7 @@ enum Category {
   Trabajo
 };
 
-#define ADC_CHANNEL 7 // A7 corresponds to ADC channel 7
+#define ADC_CHANNEL 7 // A7
 
 
 int segundos = 5; // 1500 segundos = 25 minutos
@@ -47,6 +48,7 @@ bool breakTimerIsRunning = false;
 Category selectedCategory = 0;
 byte count  = 59;
 byte pomos = 0; 
+bool buzzer = false; 
 bool screen = true; 
 
 void printESPResponse() {
@@ -94,20 +96,12 @@ int main(void) {
     Serial.begin(9600);
     espSerial.begin(9600);
     Serial.println("Estableciendo conexión...");
-    // connectToWIFI();
-
+    lcd.init();
+    lcd.backlight();
+    connectToWIFI();
     setupI2C_LCD();
     _delay_ms(2000);
-
-    clearRow(0);
-    clearRow(1);
-    lcd.setCursor(0, 0);
-    lcd.print("Pomodoro 25/5");
-    lcd.setCursor(0, 1);
-    lcd.print("Cat: ");
-    lcd.print(selectedCategory);
-    lcd.print(" - P: ");
-    lcd.print(pomos);
+    welcomeMessage();
 
     while (1) {
 
@@ -191,8 +185,14 @@ void basicTimer()
    }
    else if( segundos == 0 )
    {
+
     if (PORTD & (1 << PORTD2)) {
     PORTD &= ~(1 << PORTD2); 
+    }
+
+    if(!buzzer)
+    {
+      PORTD |= (1 << PORTD4);
     }
     
     breakTimer();
@@ -207,9 +207,13 @@ void breakTimer()
       {
 
         if (!(PORTD & (1 << PORTD3))) {
-          PORTD |= (1 << PORTD3); 
+          PORTD |= (1 << PORTD3);
           }
-
+          if(!buzzer)
+          {
+            PORTD ^= 1 << PORTD4; 
+            buzzer = true; 
+          }
           TCNT1 = 0;
           breakSeconds--;
           clearRow(0);
@@ -233,7 +237,12 @@ void breakTimer()
     // Apagar LED 
     if (PORTD & (1 << PORTD3))
     {
-      PORTD &= ~(1 < PORTD3);
+      PORTD &= ~(1 << PORTD3);
+    }
+    buzzer = false;
+     if(!buzzer)
+    {
+      PORTD |= (1 << PORTD4);
     }
     continueTimer();
   }
@@ -255,7 +264,7 @@ void continueTimer()
 
 void connectToWIFI() {
   lcd.print("Conectando WIFI");
-  _delay_ms(500);
+  _delay_ms(1000);
   String command =  "AT+CWJAP=\"" + String(WIFI_SSID) + "\",\"" + String(WIFI_PWD) + "\"";
   espSerial.println(command);
   _delay_ms(1000);
@@ -344,7 +353,19 @@ void selectPomodoro(uint16_t pV)
  }
 }
 
-// TODO: Buzzer cambio entre tiempo y break 
+void welcomeMessage()
+{
+    clearRow(0);
+    clearRow(1);
+    lcd.setCursor(0, 0);
+    lcd.print("Pomodoro 25/5");
+    lcd.setCursor(0, 1);
+    lcd.print("Cat: ");
+    lcd.print(selectedCategory);
+    lcd.print(" - P: ");
+    lcd.print(pomos);
+}
+
 // TODO: Post request / Sync 
 // TODO: Detecting multiple button pressed 
 // TODO: lcd backlight off auto 
