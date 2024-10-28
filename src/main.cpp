@@ -29,6 +29,7 @@ void printCat();
 void clearRow(byte row);
 void selectPomodoro(uint16_t pV);
 void welcomeMessage();
+void syncData();
 
 
 enum Category {
@@ -50,6 +51,8 @@ byte count  = 59;
 byte pomos = 0; 
 bool buzzer = false; 
 bool screen = true; 
+bool sync = false; 
+bool backlight = true; 
 
 void printESPResponse() {
   while (espSerial.available()) {
@@ -158,6 +161,24 @@ int main(void) {
 
       // Sync 
 
+      if(!timerIsRunning && ButtonPressed(3, PINB, 3, 100))
+      {
+          // syncData();     
+      } 
+      else if(ButtonPressed(3, PINB, 3, 100))
+      {
+        if(backlight)
+        {
+          lcd.noBacklight();
+          backlight = false; 
+        }
+        else 
+        {
+          lcd.backlight();
+          backlight = true; 
+        }
+      }
+
       basicTimer();
     }
 }
@@ -172,6 +193,7 @@ void basicTimer()
           PORTD |= (1 << PORTD2); 
         }
           PORTD &= (1<<2); // Turn off buzzer
+          sync = false; 
           TCNT1 = 0;
           segundos--;
           clearRow(0);
@@ -185,6 +207,11 @@ void basicTimer()
    }
    else if( segundos == 0 )
    {
+
+    if(!sync)
+    {
+      syncData();
+    }
 
     if (PORTD & (1 << PORTD2)) {
     PORTD &= ~(1 << PORTD2); 
@@ -201,6 +228,9 @@ void basicTimer()
 
 void breakTimer()
 {
+  
+  // syncData();
+
   if(breakSeconds > 0)
   {
     if (TCNT1 > 63000 && timerIsRunning)
@@ -227,14 +257,13 @@ void breakTimer()
   }
   else 
   {
-    clearRow(0);
+    clearRow(1);
     pomos = pomos + 1;  
     lcd.setCursor(0,1);
     lcd.print("Cat: ");
     lcd.print(selectedCategory);
     lcd.print(" - P: ");
     lcd.print(pomos);
-    // Apagar LED 
     if (PORTD & (1 << PORTD3))
     {
       PORTD &= ~(1 << PORTD3);
@@ -267,7 +296,6 @@ void connectToWIFI() {
   _delay_ms(1000);
   String command =  "AT+CWJAP=\"" + String(WIFI_SSID) + "\",\"" + String(WIFI_PWD) + "\"";
   espSerial.println(command);
-  _delay_ms(1000);
 }
 
 void setupI2C_LCD() {
@@ -327,7 +355,7 @@ void selectPomodoro(uint16_t pV)
       selectBreakSeconds = 5; 
       breakSeconds = selectBreakSeconds;
       clearRow(0);
-  lcd.setCursor(0, 0);
+      lcd.setCursor(0, 0);
       lcd.print("Pomodoro 25/5");
     } 
     else if(pV == 547)
@@ -367,5 +395,26 @@ void welcomeMessage()
 }
 
 // TODO: Post request / Sync 
-// TODO: Detecting multiple button pressed 
+
+void syncData()
+{
+  // check connection to WIFI 
+  // if !connected connect 
+  // if connected make a post request with
+  // pomos - segundos / 60 
+
+  clearRow(0);
+  lcd.setCursor(0, 0);
+  lcd.print("Sincronizando...");
+  {
+    _delay_ms(1000);
+    sync = true; 
+    // post request if correct sync = true; 
+  } while(!sync)
+  clearRow(0);
+  lcd.print("Data sintronizada"); 
+  _delay_ms(1000);
+}
+
 // TODO: lcd backlight off auto 
+// TODO: function buzzer 
