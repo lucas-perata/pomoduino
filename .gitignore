@@ -7,3 +7,4 @@
 /.pio
 .env
 Config.h
+test.cpp

@@ -29,7 +29,7 @@ void printCat();
 void clearRow(byte row);
 void selectPomodoro(uint16_t pV);
 void welcomeMessage();
-void syncData();
+void sendPostRequest(int minutes, String dateTime);
 
 
 enum Category {
@@ -163,7 +163,9 @@ int main(void) {
 
       if(!timerIsRunning && ButtonPressed(3, PINB, 3, 100))
       {
-          // syncData();     
+          // syncData();    
+          sendPostRequest(segundos / 60, "2024-12-31T10:10:10"); 
+
       } 
       else if(ButtonPressed(3, PINB, 3, 100))
       {
@@ -210,7 +212,7 @@ void basicTimer()
 
     if(!sync)
     {
-      syncData();
+      // syncData();
     }
 
     if (PORTD & (1 << PORTD2)) {
@@ -229,8 +231,6 @@ void basicTimer()
 void breakTimer()
 {
   
-  // syncData();
-
   if(breakSeconds > 0)
   {
     if (TCNT1 > 63000 && timerIsRunning)
@@ -292,10 +292,38 @@ void continueTimer()
 }
 
 void connectToWIFI() {
-  lcd.print("Conectando WIFI");
-  _delay_ms(1000);
-  String command =  "AT+CWJAP=\"" + String(WIFI_SSID) + "\",\"" + String(WIFI_PWD) + "\"";
+  lcd.clear(); 
+  lcd.print("Conectando WiFi");
+  
+  String command = "AT+CWJAP=\"" + String(WIFI_SSID) + "\",\"" + String(WIFI_PWD) + "\"";
   espSerial.println(command);
+  
+  unsigned long startTime = millis();
+  bool connected = false;
+
+  while (millis() - startTime < 15000) { // Timeout after 15 seconds
+    if (espSerial.available()) {
+      String response = espSerial.readStringUntil('\n'); // Read the response
+      Serial.println(response); // Print the response for debugging
+      
+      // Check for connection success or failure
+      if (response.indexOf("OK") != -1) {
+        lcd.clear();
+        lcd.print("Conectado!"); // Connection successful
+        connected = true;
+        break;
+      } else if (response.indexOf("FAIL") != -1) {
+        lcd.clear();
+        lcd.print("Falló la conexión"); // Connection failed
+        break;
+      }
+    }
+  }
+  
+  if (!connected) {
+    lcd.clear();
+    lcd.print("Timeout!"); 
+  }
 }
 
 void setupI2C_LCD() {
@@ -394,27 +422,41 @@ void welcomeMessage()
     lcd.print(pomos);
 }
 
-// TODO: Post request / Sync 
+void sendPostRequest(int minutes, String dateTime) {
+    String payload = "{"
+                     "\"minutes\":" + String(minutes) + ","
+                     "\"category\":" + String(selectedCategory) + ","
+                     "\"dateTime\":\"" + dateTime + "\"}";
+                     
+    espSerial.flush();
+    Serial.print(payload);
+    Serial.print(payload.length());
 
-void syncData()
-{
-  // check connection to WIFI 
-  // if !connected connect 
-  // if connected make a post request with
-  // pomos - segundos / 60 
-
-  clearRow(0);
-  lcd.setCursor(0, 0);
-  lcd.print("Sincronizando...");
-  {
-    _delay_ms(1000);
-    sync = true; 
-    // post request if correct sync = true; 
-  } while(!sync)
-  clearRow(0);
-  lcd.print("Data sintronizada"); 
-  _delay_ms(1000);
+    
+    espSerial.println("AT+CIPSTART=\"TCP\",\"192.168.0.235\",7241");
+    
+    unsigned long start = millis();
+    while (millis() - start < 10000) {
+        if (espSerial.find("CONNECT")) break;
+        if (espSerial.find("ERROR")) { 
+            espSerial.println("AT+CWQAP");
+            return;
+        }
+    }
+    
+    String request = String("POST /api/TimeEntry HTTP/1.1\r\n") +
+                     "Host: 192.168.0.235:7241\r\n" +
+                     "Content-Type: application/json\r\n" +
+                     "Content-Length: " + String(payload.length()) + "\r\n" +
+                     "Connection: close\r\n\r\n" + payload;
+                     
+    espSerial.println("AT+CIPSEND=" + String(request.length()));
+    if (espSerial.find(">")) {
+        espSerial.print(request);
+        espSerial.println("AT+CIPCLOSE");
+    }
 }
+
 
 // TODO: lcd backlight off auto 
 // TODO: function buzzer 
