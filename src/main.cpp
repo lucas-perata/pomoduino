@@ -29,12 +29,16 @@ void printCat();
 void clearRow(byte row);
 void selectPomodoro(uint16_t pV);
 void welcomeMessage();
-void sendPostRequest(int minutes, String dateTime);
+void sendPostRequest(int minutes);
 
 
 enum Category {
-  Estudio, 
-  Trabajo
+  Estudio,// 0
+  Trabajo, // 1
+  Programacion, // 2
+  Ejercicio, // 3
+  Meditacion, // 4
+  Lectura // 5
 };
 
 #define ADC_CHANNEL 7 // A7
@@ -42,16 +46,17 @@ enum Category {
 
 int segundos = 5; // 1500 segundos = 25 minutos
 short int breakSeconds = 5; // 500 = 5 minutos
-int selectSeconds = 5; // Valor por default
-int selectBreakSeconds = 5; // Valor por default
+int selectSeconds = 1; // Valor por default
+int selectBreakSeconds = 1; // Valor por default
 bool timerIsRunning = false; 
 bool breakTimerIsRunning = false;
-Category selectedCategory = 0;
+Category selectedCategory = Estudio;
 byte count  = 59;
 byte pomos = 0; 
 bool buzzer = false; 
 bool screen = true; 
 bool sync = false; 
+short int syncAttempts = 0; 
 bool backlight = true; 
 
 void printESPResponse() {
@@ -130,30 +135,41 @@ int main(void) {
         if(!timerIsRunning)  
         {
           timerIsRunning = true;
-          PORTD ^= (1 << PORTD2);  // Toggle LED
           PORTD ^= (1 << PORTD4);  // Toggle Buzzer
+
+          if(segundos > 0)
+          {
+             PORTD ^= (1 << PORTD2);
+          }
+          else 
+          {
+            PORTD ^= (1 << PORTD3);
+          }
         }
         else 
         {
-          PORTD ^= (1 << PORTD2);
           timerIsRunning = false;
+          if(segundos > 0)
+          {
+             PORTD ^= (1 << PORTD2);
           }
+          else 
+          {
+            PORTD ^= (1 << PORTD3);
+          }
+        }
       } 
 
       // Selección categoría 
       if(ButtonPressed(1, PINB, 1, 100)) 
       {
         selectCategory();
-        espSerial.println("AT");
       }
 
       // Reseteo timer
       if(ButtonPressed(2, PINB, 2, 100))
       {
-        PORTD &= (1 << 1);
-        clearRow(0);
-        lcd.setCursor(0, 0);
-        lcd.print("Timer reseteado");
+        timerIsRunning = false;
         resetTimer();
       }
     
@@ -164,7 +180,7 @@ int main(void) {
       if(!timerIsRunning && ButtonPressed(3, PINB, 3, 100))
       {
           // syncData();    
-          sendPostRequest(segundos / 60, "2024-12-31T10:10:10"); 
+          sendPostRequest(segundos / 60); 
 
       } 
       else if(ButtonPressed(3, PINB, 3, 100))
@@ -187,7 +203,7 @@ int main(void) {
 
 void basicTimer()
 {
-   if(segundos > 0) 
+   if(segundos > 0 && timerIsRunning) 
    {
     if (TCNT1 > 63000 && timerIsRunning)
       {
@@ -203,16 +219,19 @@ void basicTimer()
           lcd.print("Timer -> ");
           lcd.print(segundos/60);
           lcd.print(":");
+          if(count < 10)
+          {
+            lcd.print("0");
+          }
           lcd.print(count--);
           if(count == 0) {count = 59;}
       }
    }
    else if( segundos == 0 )
    {
-
-    if(!sync)
+    if(!sync && syncAttempts == 0)
     {
-      // syncData();
+      sendPostRequest(selectSeconds / 60);
     }
 
     if (PORTD & (1 << PORTD2)) {
@@ -231,7 +250,7 @@ void basicTimer()
 void breakTimer()
 {
   
-  if(breakSeconds > 0)
+  if(breakSeconds > 0 && timerIsRunning)
   {
     if (TCNT1 > 63000 && timerIsRunning)
       {
@@ -244,6 +263,10 @@ void breakTimer()
             PORTD ^= 1 << PORTD4; 
             buzzer = true; 
           }
+          PORTD &= (1<<2);
+          PORTD ^= (1 << PORTD3);
+
+
           TCNT1 = 0;
           breakSeconds--;
           clearRow(0);
@@ -251,11 +274,15 @@ void breakTimer()
           lcd.print("Descanso -> ");
           lcd.print(breakSeconds/60);
           lcd.print(":");
+          if(count < 10)
+          {
+            lcd.print("0");
+          }
           lcd.print(count--);
           if(count == 0) {count = 59;}
       }
   }
-  else 
+  else if (breakSeconds == 0)
   {
     clearRow(1);
     pomos = pomos + 1;  
@@ -273,15 +300,20 @@ void breakTimer()
     {
       PORTD |= (1 << PORTD4);
     }
+    sync = false; 
     continueTimer();
   }
 }
 
 void resetTimer()
 {
-  timerIsRunning = false;
+  PORTD &= (1 << 1);
   segundos = selectSeconds;
   breakSeconds = selectBreakSeconds; 
+  count = 59; 
+  clearRow(0);
+  lcd.setCursor(0, 0);
+  lcd.print("Timer reseteado");
 }
 
 void continueTimer()
@@ -336,23 +368,29 @@ void setupI2C_LCD() {
 }
 
 void selectCategory() {
+  selectedCategory = static_cast<Category>((selectedCategory + 1) % 6);
   lcd.setCursor(0,1);
   lcd.print("Cat: ");
-
+  
     switch (selectedCategory)
     {
-    case 0:
-      selectedCategory = 1;
-      lcd.print("Test 1");
+    case Estudio:
+      lcd.print("0");
       break;
-    case 1: 
-      lcd.print("Test 2");
-      selectedCategory = 2;
+    case Trabajo: 
+      lcd.print("1");
       break;
-    case 2: 
-    selectedCategory = 0; 
-    lcd.print("Test 3");
+    case Programacion: 
+    lcd.print("2");
     break;
+    case Ejercicio: 
+    lcd.print("3");
+    break; 
+    case Meditacion: 
+    lcd.print("4");
+    break; 
+    case Lectura: 
+    lcd.print("5");
     default:
       break;
     }
@@ -376,11 +414,11 @@ void selectPomodoro(uint16_t pV)
 {
  if(!timerIsRunning) 
  {
-  if(pV == 13)
+  if(pV == 19)
     {
-      selectSeconds = 5; 
+      selectSeconds = 1500; 
       segundos = selectSeconds;
-      selectBreakSeconds = 5; 
+      selectBreakSeconds = 300; 
       breakSeconds = selectBreakSeconds;
       clearRow(0);
       lcd.setCursor(0, 0);
@@ -388,9 +426,9 @@ void selectPomodoro(uint16_t pV)
     } 
     else if(pV == 547)
     {
-      selectSeconds = 6; 
+      selectSeconds = 2100; 
       segundos = selectSeconds;
-      selectBreakSeconds = 6;
+      selectBreakSeconds = 600;
       breakSeconds = selectBreakSeconds;
       clearRow(0);
       lcd.setCursor(0, 0);
@@ -422,16 +460,18 @@ void welcomeMessage()
     lcd.print(pomos);
 }
 
-void sendPostRequest(int minutes, String dateTime) {
+void sendPostRequest(int minutes) {
     String payload = "{"
                      "\"minutes\":" + String(minutes) + ","
-                     "\"category\":" + String(selectedCategory) + ","
-                     "\"dateTime\":\"" + dateTime + "\"}";
+                     "\"category\":" + String(selectedCategory) + "}";
                      
     espSerial.flush();
     Serial.print(payload);
     Serial.print(payload.length());
 
+      clearRow(0); 
+      lcd.setCursor(0, 0); 
+      lcd.print("Sincronizando...");
     
     espSerial.println("AT+CIPSTART=\"TCP\",\"192.168.0.235\",7241");
     
@@ -451,12 +491,28 @@ void sendPostRequest(int minutes, String dateTime) {
                      "Connection: close\r\n\r\n" + payload;
                      
     espSerial.println("AT+CIPSEND=" + String(request.length()));
+
     if (espSerial.find(">")) {
         espSerial.print(request);
-        espSerial.println("AT+CIPCLOSE");
+        if (espSerial.find("SEND OK")) {
+            espSerial.println("AT+CIPCLOSE");
+            clearRow(0); 
+            lcd.setCursor(0, 0); 
+            lcd.print("Sincronizado!");
+            sync = true; 
+            syncAttempts = 0; 
+        } 
     }
-}
+
+    if(!sync)
+    {
+       espSerial.println("AT+CIPCLOSE");
+        clearRow(0); 
+        lcd.setCursor(0, 0); 
+        lcd.print("Error de sync...");
+        syncAttempts++;
+    }
+} 
 
 
-// TODO: lcd backlight off auto 
-// TODO: function buzzer 
+
